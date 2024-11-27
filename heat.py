@@ -3,12 +3,22 @@ from random import randint
 from datetime import datetime, timedelta
 from time import sleep
 import logging
-from os import environ
+from os import environ, makedirs, chdir 
 
 def main(requested_days=180, weekdays=7):
     commit_ranges = [(1, 1), (2, 4), (5, 9), (10, 19), (20, 25)]
     # Current date and time
     now = datetime.now()
+
+
+    # Generating the repo name with date and time included, in case the script is executed multiple times
+    repo_name = f"heated-repository-{now}"
+
+    # Create directory
+    make_directory(repo_name)
+
+    # Create the repository
+    create_repo(repo_name)
 
     # Create a timedelta of 1 day
     delta = timedelta(days=1)
@@ -28,6 +38,9 @@ def main(requested_days=180, weekdays=7):
                 sleep(0.1)
         # Increase the timedelta by one
         delta += timedelta(days=1)
+    
+    # Push the commits to github
+    run(["git", "push", "-u", "origin", "main"])
 
 
 def generate_commit(day, month, year):
@@ -43,6 +56,19 @@ def generate_commit(day, month, year):
         file.write(f"Commit date: {commit_date}\n")
     run(["git", "add", "heat.txt"])
     run(["git", "commit", "-m", f"Commit for {commit_date}", "heat.txt"])
+
+def create_repo(repository_name):
+    # Initialize a git repo
+    run(["git", "init"])
+
+    # Create a private github repo and link it to the git folder
+    run(["gh", "repo", "create", repository_name, "--private", "--source", "--remote=origin"])
+
+def make_directory(repository_name):
+
+    # Automatically create the Directory if it doesn't exist and switch to it
+    makedirs(repository_name, exist_ok=True)  
+    chdir(repository_name)  
 
 if __name__ == '__main__':
     main()
