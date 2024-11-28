@@ -6,6 +6,7 @@ from os import environ, makedirs, chdir
 from sys import exit
 import shutil
 import logging
+import argparse
 
 logger = logging.getLogger()
 logger.setLevel(logging.DEBUG)
@@ -14,7 +15,7 @@ console_handler = logging.StreamHandler()
 console_handler.setFormatter(format)
 logger.addHandler(console_handler)
 
-def main(requested_days=180, weekdays=7):
+def main(requested_days, weekdays):
 
     # Generating the repo name with date and time included, in case the script is executed multiple times
     repo_name = f"heated-repository-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
@@ -111,8 +112,15 @@ def get_commit_intensity():
     intensity = commit_ranges[randint(0, 4)]
     return randint(intensity[0], intensity[1])
 
+def parse_arguments():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--days", type=int, default=180, help="Number of days for commits.")
+    parser.add_argument("--weekdays", type=int, default=7, help="Number of weekdays to commit.")
+    return parser.parse_args()
+
 
 if __name__ == '__main__':
+    args = parse_arguments()
     check_dependencies()
-    main()
+    main(requested_days=args.days, weekdays=args.weekdays)
 
