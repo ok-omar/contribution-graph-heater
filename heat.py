@@ -15,41 +15,49 @@ console_handler = logging.StreamHandler()
 console_handler.setFormatter(format)
 logger.addHandler(console_handler)
 
-def main(requested_days, weekdays):
-
-    # Generating the repo name with date and time included, in case the script is executed multiple times
-    repo_name = f"heated-repository-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
-
+def main(username, repo, requested_days, weekdays):
+    
     # Create directory
-    make_directory(repo_name)
+    make_directory(repo)
 
     # Create the repository
-    create_repo(repo_name)    
+    create_repo(repo)    
 
     # Current date and time
     now = datetime.now()
 
-    # Create a timedelta of 1 day
-    delta = timedelta(days=1)
+    # Generate the start date
+    start_date = now - timedelta(days=requested_days - 1)
 
     # Subtract the timedelta from the current date
-    for _ in range(requested_days):
-        time = (now - delta).date()
-
+    for day_offset in range(requested_days):
+        time = (start_date + timedelta(days=day_offset)).date()
         # Check if the current day is withing the days requested by the user
         if time.weekday() < weekdays:
-
             # Select the color intensity of the cell randomly
             commits_quantity = get_commit_intensity()
-
             # Generate the commits
-            for _ in range(commits_quantity):
-                generate_commit(time.day, time.month, time.year)
-        # Increase the timedelta by one
-        delta += timedelta(days=1)
-    
-    # Push the commits to github
-    run(["git", "push", "-u", "origin", "main"])
+            generate_commit(time.day, time.month, time.year, commits_quantity)
+
+    # Push the commits to GitHub
+    try:
+        # Check if the remote origin exists
+        run(["git", "remote", "get-url", "origin"], check=True, capture_output=True)
+        logger.info("Remote 'origin' already exists.")
+    except CalledProcessError:
+        # If it doesn't exist, add the remote
+        try:
+            run(["git", "remote", "add", "origin", f"https://github.com/{username}/{repo}.git"], check=True)
+            logger.info("Remote 'origin' added successfully.")
+        except CalledProcessError as error:
+            logger.error(f"Error adding remote: {error}")
+            exit(3)
+
+    try:
+        run(["git", "push", "--force", "origin", "main"], check=True)
+    except CalledProcessError as error:
+        logger.error("Error, failed to push the changes to GitHub. Please ensure the repository exists and you have the correct permissions.")
+        exit(3)
 
 def check_dependencies():
 
@@ -62,7 +70,7 @@ def check_dependencies():
             missing_tools.append(tool)
     
     if missing_tools:
-        logger.info(f"Missing tools: {", ".join(missing_tools)}")
+        logger.info(f"Missing tools: {', '.join(missing_tools)}")
         logger.info(f"Please install the missing tools and ensure they are in your system's PATH.")
         # Stop the script from executing in case the git and / or gh are missing 
         exit(1)
@@ -71,35 +79,57 @@ def check_dependencies():
 
 
 
-def generate_commit(day, month, year):
-    # Set commit date
-    commit_date = f"{year}-{month:02d}-{day:02d} {randint(10,12)}:{randint(10,59)}:{randint(10,59)}"
+def generate_commit(day, month, year, quantity):
 
-    # Set envirement dates to ensure compatibility with Linux, MacOS and Windows
-    environ["GIT_AUTHOR_DATE"] = commit_date
-    environ["GIT_COMMITTER_DATE"] = commit_date
-    
-    # Create / open the dummy file to append the date of the commit
-    with open("heat.txt", "a") as file:
-        file.write(f"Commit date: {commit_date}\n")
-    try: 
-        run(["git", "add", "heat.txt"] ,check=True)
-        run(["git", "commit", "-m", f"Commit for {commit_date}", "heat.txt"], check=True)
-    except CalledProcessError as error:
-        logger.error(f"Git command failed: {error}")
-        exit(2)
+    # Setting the starting hour of the provided date
+    base_time = datetime(year, month, day, hour=9)
+
+    # Generating an array of times starting from the base time 10 minutes apart
+    time_slots = [base_time + timedelta(minutes=10 * i) for i in range(quantity)]
+
+    # Iterating over all the time slots
+    for commit_time in time_slots:
+        # Formatting the date to the format git accepts 
+        commit_date = commit_time.strftime("%Y-%m-%d %H:%M:%S")
+
+        # Changing the envirement dates to the formatted date
+        environ["GIT_AUTHOR_DATE"] = commit_date
+        environ["GIT_COMMITTER_DATE"] = commit_date
+        
+        # Generating the commit
+        with open("heat.txt", "a") as file:
+            file.write(f"Commit date: {commit_date}\n")
+        try:
+            run(["git", "add", "heat.txt"], check=True)
+            run(["git", "commit", "-m", f"Commit for {commit_date}"], check=True)
+        except CalledProcessError as error:
+            logger.error(f"Git command failed: {error}")
+            exit(2)     
 
 def create_repo(repository_name):
-    
-    # Initialize a git repo
-    logger.info("Initializing git...")  
-    run(["git", "init"])
-    sleep(0.1)
-    # Create a private github repo and link it to the git folder
-    logger.info(f"Creating repository: {repository_name}")
-    run(["gh", "repo", "create", repository_name, "--private", "--source", "--remote=origin"])
-    sleep(0.1)
-    logger.info(f"Repository {repository_name} created succesfully!")
+    try:
+        # Initialize a git repo
+        logger.info("Initializing git repository...")
+        run(["git", "init"], check=True) 
+
+        # Remove any existing remote named 'origin'
+        run(["git", "remote", "remove", "origin"], check=False) 
+        
+        # Create a private GitHub repo and link it to the git folder
+        logger.info(f"Creating GitHub repository: {repository_name}")
+        result = run(["gh", "repo", "create", repository_name, "--private", "--source=.",  "--remote=origin"], check=True, capture_output=True, text=True)
+        # log the output from the command
+        logger.info(result.stdout)
+        
+        logger.info(f"Repository '{repository_name}' created successfully!")
+    except CalledProcessError as error:
+        logger.error(f"Failed to create repository: {error}")
+        logger.error(f"Error details: {error.stderr}")
+        exit(3)
+    except Exception as unexpected_error:
+        logger.error(f"An unexpected error occurred: {unexpected_error}")
+        exit(4)
+
 
 def make_directory(repository_name):
     # Automatically create the Directory if it doesn't exist and switch to it
@@ -116,11 +146,16 @@ def parse_arguments():
     parser = argparse.ArgumentParser()
     parser.add_argument("--days", type=int, default=180, help="Number of days for commits.")
     parser.add_argument("--weekdays", type=int, default=7, help="Number of weekdays to commit.")
+    parser.add_argument("--username", type=str, help="Your github username")
+    parser.add_argument("--repo", type=str, help="Your github's repository")
     return parser.parse_args()
 
 
 if __name__ == '__main__':
     args = parse_arguments()
+    if not args.username or not args.repo:
+        logger.error("Error: Both --username and --repo are required.")
+        exit(1)
+    
     check_dependencies()
-    main(requested_days=args.days, weekdays=args.weekdays)
-
+    main(repo=args.repo, username=args.username, requested_days=args.days, weekdays=args.weekdays)
