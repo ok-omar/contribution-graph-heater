@@ -12,6 +12,9 @@ This Python script automates the process of generating commits on GitHub to crea
 - Generates a series of commits on specified days, from a given start date, simulating daily GitHub activity.
 - The script pushes all the commits to GitHub using the Git and GitHub CLI.
 
+## Before You Start
+This script isn't here to promote shortcuts. Taking shortcuts isn’t great. However, if someone is evaluating your skills based on a colorful GitHub heatmap (which isn’t an actual skill), they might as well be impressed with what they see.
+
 ## Prerequisites
 
 To run this script, you need to have the following tools installed and accessible in your system's PATH:
@@ -91,10 +94,14 @@ Always double-check the repository name before running the script!
 
 ## Troubleshooting
 
-If you encounter issues, make sure:
+#### If you encounter issues, make sure:
 
 - `gh` is authenticated, run `gh auth login`
 - The necessary tools (`Python`, `git` and `gh`) are installed and in the system PATH.
+
+#### The script executed with no errors, why my github's heatmap hasn't changed? 
+- **Check Private Contributions**: If the script executed without errors but you don’t see changes on your heatmap, ensure that Private Contributions are enabled in the Contribution Settings (found in the top-right corner of your heatmap). The script creates a private repository by default, so these contributions won’t show unless this setting is turned on. Alternatively, you can change the repository’s visibility to public. 
+- **Wait for Updates**: GitHub might take some time to update your heatmap. If everything seems correct and you still don’t see changes, wait a few minutes and check again.
 
 ## License
 
